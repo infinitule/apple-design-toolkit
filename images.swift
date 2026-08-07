@@ -1,4 +1,5 @@
 import AppKit
+import CoreImage
 
 // Renders the repo's imagery. Every control here is drawn from the values
 // figma-apple-kit-extract pulls out of Apple's macOS 27 UI Kit, so the
@@ -639,4 +640,204 @@ do {
 
     c.footnote("apple-design-toolkit · every value read from the macOS 27 UI Kit", 190, 1020)
     c.save("inventory.png")
+}
+
+// ===========================================================================
+// SOCIAL — 1080 x 1080. Real Liquid Glass: the backdrop is rendered offscreen,
+// blurred with CoreImage, and shown through the panel. (Snapshotting the live
+// rep instead orphans the active context and silently drops all later drawing.)
+// ===========================================================================
+
+func offscreen(_ w: Int, _ h: Int, _ draw: (CGContext) -> Void) -> CGImage {
+    let r = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h,
+                             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                             colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: r)
+    draw(NSGraphicsContext.current!.cgContext)
+    NSGraphicsContext.restoreGraphicsState()
+    return r.cgImage!
+}
+
+func blurCG(_ cg: CGImage, _ radius: Double) -> CGImage? {
+    let ci = CIImage(cgImage: cg)
+    guard let f = CIFilter(name: "CIGaussianBlur") else { return nil }
+    f.setValue(ci.clampedToExtent(), forKey: kCIInputImageKey)
+    f.setValue(radius, forKey: kCIInputRadiusKey)
+    guard let out = f.outputImage?.cropped(to: ci.extent) else { return nil }
+    return CIContext(options: nil).createCGImage(out, from: ci.extent)
+}
+
+func rawBloom(_ ctx: CGContext, _ x: CGFloat, _ y: CGFloat, _ r: CGFloat, _ c: NSColor, _ a: CGFloat) {
+    let cc = c.withAlphaComponent(a).cgColor
+    let g = CGGradient(colorsSpace: space, colors: [cc, cc.copy(alpha: 0)!] as CFArray, locations: [0,1])!
+    ctx.drawRadialGradient(g, startCenter: CGPoint(x: x, y: y), startRadius: 0,
+                           endCenter: CGPoint(x: x, y: y), endRadius: r, options: [])
+}
+
+extension Canvas {
+    func glassWith(_ r: CGRect, _ rad: CGFloat, _ blurred: CGImage?, tint: CGFloat = 0.10) {
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 40, color: CGColor(gray: 0, alpha: 0.45))
+        ctx.addPath(rounded(r, rad)); ctx.setFillColor(CGColor(gray: 0.02, alpha: 0.55)); ctx.fillPath()
+        ctx.restoreGState()
+
+        if let b = blurred {
+            ctx.saveGState()
+            ctx.addPath(rounded(r, rad)); ctx.clip()
+            ctx.draw(b, in: CGRect(x: 0, y: 0, width: W, height: H))
+            ctx.setFillColor(CGColor(gray: 1, alpha: tint)); ctx.fill(r)
+            let sheen = CGGradient(colorsSpace: space, colors: [
+                CGColor(gray: 1, alpha: 0.28), CGColor(gray: 1, alpha: 0)] as CFArray, locations: [0,1])!
+            ctx.drawLinearGradient(sheen, start: CGPoint(x: 0, y: r.maxY),
+                                   end: CGPoint(x: 0, y: r.maxY - r.height * 0.44), options: [])
+            let under = CGGradient(colorsSpace: space, colors: [
+                CGColor(gray: 1, alpha: 0.14), CGColor(gray: 1, alpha: 0)] as CFArray, locations: [0,1])!
+            ctx.drawLinearGradient(under, start: CGPoint(x: 0, y: r.minY),
+                                   end: CGPoint(x: 0, y: r.minY + r.height * 0.24), options: [])
+            ctx.restoreGState()
+        }
+        ctx.addPath(rounded(r.insetBy(dx: 1.5, dy: 1.5), rad))
+        ctx.setStrokeColor(CGColor(gray: 1, alpha: 0.50)); ctx.setLineWidth(3); ctx.strokePath()
+    }
+
+    func centred(_ s: String, _ top: CGFloat, _ size: CGFloat, _ w: NSFont.Weight,
+                 _ col: NSColor, mono: Bool = false) {
+        text(s, (W - textW(s, size, w, mono: mono)) / 2, top, size, w, col, mono: mono)
+    }
+
+    /// Folded-paper pulse mark — same miter-offset + per-facet normal shading
+    /// used for the app icon.
+    func pulseMark(_ box: CGRect) {
+        let src: [[CGFloat]] = [[230,553],[352,553],[412,468],[464,608],[530,272],
+                                [600,748],[660,498],[722,553],[795,553]]
+        let sx = box.width / 570, sy = box.height / 480
+        let P = src.map { CGPoint(x: box.minX + ($0[0] - 225) * sx,
+                                  y: box.maxY - ($0[1] - 262) * sy) }
+        let h = 28 * min(sx, sy)
+        func nrm(_ v: CGPoint) -> CGPoint { let l = max(hypot(v.x, v.y), 0.0001); return CGPoint(x: v.x/l, y: v.y/l) }
+        var Noff: [CGPoint] = [], Nlit: [CGPoint] = []
+        for i in 0..<(P.count - 1) {
+            let d = nrm(CGPoint(x: P[i+1].x - P[i].x, y: P[i+1].y - P[i].y))
+            Noff.append(CGPoint(x: -d.y, y: d.x)); Nlit.append(CGPoint(x: d.y, y: -d.x))
+        }
+        var top: [CGPoint] = [], bot: [CGPoint] = []
+        for i in 0..<P.count {
+            var m: CGPoint, s: CGFloat
+            if i == 0 { m = Noff[0]; s = h }
+            else if i == P.count - 1 { m = Noff[Noff.count - 1]; s = h }
+            else {
+                m = nrm(CGPoint(x: Noff[i-1].x + Noff[i].x, y: Noff[i-1].y + Noff[i].y))
+                let cc = m.x * Noff[i-1].x + m.y * Noff[i-1].y
+                s = abs(cc) < 0.35 ? h * 2.4 : min(h / cc, h * 2.4)
+            }
+            top.append(CGPoint(x: P[i].x + m.x * s, y: P[i].y + m.y * s))
+            bot.append(CGPoint(x: P[i].x - m.x * s, y: P[i].y - m.y * s))
+        }
+        let out = CGMutablePath()
+        out.move(to: CGPoint(x: top[0].x + 5, y: top[0].y - 7))
+        for p in top.dropFirst() { out.addLine(to: CGPoint(x: p.x + 5, y: p.y - 7)) }
+        for p in bot.reversed() { out.addLine(to: CGPoint(x: p.x + 5, y: p.y - 7)) }
+        out.closeSubpath()
+        ctx.addPath(out); ctx.setFillColor(CGColor(red: 0.02, green: 0.06, blue: 0.16, alpha: 1)); ctx.fillPath()
+
+        let L = nrm(CGPoint(x: -0.55, y: 0.83))
+        let stops: [(CGFloat, [CGFloat])] = [(0,[26,86,170]),(0.34,[41,128,235]),(0.66,[125,205,255]),(1,[255,255,255])]
+        for i in 0..<(P.count - 1) {
+            let t = ((Nlit[i].x * L.x + Nlit[i].y * L.y) + 1) / 2
+            var col: [CGFloat] = [255,255,255]
+            for k in 0..<(stops.count - 1) where t <= stops[k+1].0 || k == stops.count - 2 {
+                let f = max(0, min(1, (t - stops[k].0) / (stops[k+1].0 - stops[k].0)))
+                col = (0..<3).map { stops[k].1[$0] + (stops[k+1].1[$0] - stops[k].1[$0]) * f }
+                break
+            }
+            let q = CGMutablePath()
+            q.move(to: top[i]); q.addLine(to: top[i+1]); q.addLine(to: bot[i+1]); q.addLine(to: bot[i])
+            q.closeSubpath()
+            ctx.addPath(q)
+            ctx.setFillColor(CGColor(red: col[0]/255, green: col[1]/255, blue: col[2]/255, alpha: 1))
+            ctx.fillPath()
+        }
+        for i in 1..<(P.count - 1) { ctx.move(to: top[i]); ctx.addLine(to: bot[i]) }
+        ctx.setStrokeColor(CGColor(gray: 1, alpha: 0.24)); ctx.setLineWidth(2); ctx.strokePath()
+    }
+}
+
+// --- SOCIAL 1: MacPulse -----------------------------------------------------
+do {
+    let full = CGRect(x: 0, y: 0, width: 1080, height: 1080)
+    let sharp = offscreen(1080, 1080) { ctx in
+        let g = CGGradient(colorsSpace: space, colors: [
+            CGColor(red: 0.086, green: 0.153, blue: 0.286, alpha: 1),
+            CGColor(red: 0.012, green: 0.031, blue: 0.078, alpha: 1)] as CFArray, locations: [0,1])!
+        ctx.drawLinearGradient(g, start: CGPoint(x: 0, y: 1080), end: CGPoint(x: 760, y: 0),
+                               options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+        rawBloom(ctx, 190, 880, 620, NSColor(red: 0.22, green: 0.58, blue: 1.0, alpha: 1), 0.44)
+        rawBloom(ctx, 940, 320, 560, NSColor(red: 0.35, green: 0.84, blue: 1.0, alpha: 1), 0.28)
+        rawBloom(ctx, 620, 990, 520, NSColor(red: 0.58, green: 0.36, blue: 1.0, alpha: 1), 0.24)
+        ctx.setStrokeColor(CGColor(gray: 1, alpha: 0.12)); ctx.setLineWidth(6)
+        let wave: [[CGFloat]] = [[-40,660],[190,660],[262,576],[314,724],[418,250],[506,910],[578,556],[664,660],[1120,660]]
+        for (i, p) in wave.enumerated() {
+            i == 0 ? ctx.move(to: CGPoint(x: p[0], y: 1080 - p[1]))
+                   : ctx.addLine(to: CGPoint(x: p[0], y: 1080 - p[1]))
+        }
+        ctx.strokePath()
+    }
+    let blur = blurCG(sharp, 24)
+
+    let c = Canvas(1080, 1080)
+    c.ctx.draw(sharp, in: full)
+    c.pulseMark(CGRect(x: 396, y: c.y(78, 236), width: 288, height: 236))
+
+    let panel = CGRect(x: 88, y: c.y(400, 268), width: 904, height: 268)
+    c.glassWith(panel, 54, blur, tint: 0.10)
+    c.text("≥ 2:14", 140, 452, 110, .bold, .white)
+    c.text("95% confidence runtime", 148, 582, 27, .medium, NSColor(white: 1, alpha: 0.66))
+    c.kitSwitch(716, 470, 3.3)
+    c.text("Low Power", 716, 566, 25, .medium, NSColor(white: 1, alpha: 0.6))
+
+    c.centred("MacPulse", 726, 86, .bold, .white)
+    c.centred("Your Mac saves power based on a number that cannot", 846, 27, .regular, NSColor(white: 1, alpha: 0.62))
+    c.centred("know the answer. This one forecasts instead.", 884, 27, .regular, NSColor(white: 1, alpha: 0.62))
+    c.centred("github.com/infinitule/MacPulse", 980, 24, .medium, NSColor(white: 1, alpha: 0.38), mono: true)
+    c.save("social-macpulse.png")
+}
+
+// --- SOCIAL 2: Apple Design Toolkit -----------------------------------------
+do {
+    let full = CGRect(x: 0, y: 0, width: 1080, height: 1080)
+    let sharp = offscreen(1080, 1080) { ctx in
+        let g = CGGradient(colorsSpace: space, colors: [
+            CGColor(red: 0.055, green: 0.078, blue: 0.153, alpha: 1),
+            CGColor(red: 0.008, green: 0.020, blue: 0.047, alpha: 1)] as CFArray, locations: [0,1])!
+        ctx.drawLinearGradient(g, start: CGPoint(x: 0, y: 1080), end: CGPoint(x: 820, y: 0),
+                               options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+        rawBloom(ctx, 140, 940, 540, figmaColors[0], 0.55)
+        rawBloom(ctx, 430, 1020, 470, figmaColors[1], 0.45)
+        rawBloom(ctx, 790, 910, 540, figmaColors[2], 0.52)
+        rawBloom(ctx, 990, 540, 500, figmaColors[3], 0.48)
+        rawBloom(ctx, 610, 700, 430, figmaColors[4], 0.32)
+    }
+    let blur = blurCG(sharp, 32)
+
+    let c = Canvas(1080, 1080)
+    c.ctx.draw(sharp, in: full)
+    c.centred("A P P L E   D E S I G N   T O O L K I T", 88, 25, .semibold, NSColor(white: 1, alpha: 0.55))
+
+    let card = CGRect(x: 86, y: c.y(168, 428), width: 908, height: 428)
+    c.glassWith(card, 62, blur, tint: 0.12)
+
+    let ss: CGFloat = 6.4
+    let sw = c.kitSwitch((1080 - 54 * ss) / 2, 300, ss)
+    c.hDim(sw.minX, sw.maxX, 258, NSColor(white: 1, alpha: 0.8))
+    c.centred("54 × 24 pt", 202, 30, .medium, NSColor(white: 1, alpha: 0.92))
+    c.centred("knob 32 × 20 pill   ·   track black @ 85%", 492, 27, .medium, NSColor(white: 1, alpha: 0.72))
+    c.centred("cornerRadius 1000   ·   shadow r15 · y8 · α0.02", 536, 25, .regular, NSColor(white: 1, alpha: 0.46))
+
+    c.centred("Read Apple's design system.", 700, 52, .bold, .white)
+    c.centred("Ship it as native code.", 762, 52, .bold, NSColor(white: 1, alpha: 0.58))
+    c.centred("4 Claude Code skills  ·  measured from the macOS 27 UI Kit",
+              872, 26, .regular, NSColor(white: 1, alpha: 0.58))
+    c.centred("github.com/infinitule/apple-design-toolkit", 966, 24, .medium, NSColor(white: 1, alpha: 0.38), mono: true)
+    c.save("social-toolkit.png")
 }
