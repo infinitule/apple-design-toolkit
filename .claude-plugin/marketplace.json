@@ -1,0 +1,29 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "apple-design-toolkit",
+  "description": "Skills for building native macOS apps against Apple's official Figma UI kits \u2014 design extraction, single-file SwiftUI app builds, and safe password-free root operations",
+  "owner": {
+    "name": "Chandandeep Sharma",
+    "email": "me@chandanofficial.com"
+  },
+  "plugins": [
+    {
+      "name": "apple-design-toolkit",
+      "source": "./apple-design-toolkit",
+      "description": "Four skills for native Mac development: extract exact control specs from Apple's macOS/iOS UI kits in Figma and map them to SwiftUI; build, sign and ship a real .app from one Swift file with no Xcode project; give an app password-free root operations through a hardened spool-agent pattern; and satisfy policy hooks that gate tool calls without burning a retry on every one.",
+      "author": {
+        "name": "Chandandeep Sharma"
+      },
+      "category": "development",
+      "keywords": [
+        "macos",
+        "swiftui",
+        "figma",
+        "design-systems",
+        "app-icon",
+        "launchd",
+        "agent-harness"
+      ]
+    }
+  ]
+}
