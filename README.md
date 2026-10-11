@@ -24,7 +24,7 @@
 /plugin install apple-design-toolkit@apple-design-toolkit
 ```
 
-Or drop any single `SKILL.md` into `~/.claude/skills/<name>/SKILL.md`. No dependencies, no build step — they're documents.
+Or drop any single `SKILL.md` into `~/.claude/skills/<name>/SKILL.md`. The skills are documents; the Swift package below is optional executable code that implements the same patterns.
 
 ---
 
@@ -115,13 +115,13 @@ Six drawings from the library. No screenshots, no traced artwork — every measu
 **What it does.** Gives you the complete extraction pipeline:
 
 ```
-get_libraries(fileKey)                        → every attached kit's libraryKey
+get_libraries(fileKey)                        -> every attached kit's libraryKey
   ↓
-search_design_system("button", …, [kitKey])   → componentKey + assetType
+search_design_system("button", …, [kitKey])   -> componentKey + assetType
   ↓
-use_figma: importComponentSetByKeyAsync       → instantiate, walk, measure
+use_figma: importComponentSetByKeyAsync       -> instantiate, walk, measure
   ↓
-fills / radii / effects / paddings            → SwiftUI values
+fills / radii / effects / paddings            -> SwiftUI values
 ```
 
 It also covers the macOS 27 **Liquid Glass anatomy** (why the glass plate is a *stack* of translucent fills, never one averaged colour), building **parametric faceted icon marks** (miter-offset ribbon geometry, per-facet normal shading), and the full `.icns` export chain.
@@ -200,7 +200,7 @@ Supporting rules the skill enforces: the agent script must be **root-owned** (ro
 
 ### 4. `gated-tool-preflight`
 
-**The problem it solves.** Agent harnesses increasingly wrap tools in policy hooks that reject a call and demand justification first. The expensive failure is not the gate — it is *fail → read the demand → retry the identical call*, repeated for an entire session because nothing was learned from the first denial. At volume this dominates both cost and latency.
+**The problem it solves.** Agent harnesses increasingly wrap tools in policy hooks that reject a call and demand justification first. The expensive failure is not the gate — it is *fail -> read the demand -> retry the identical call*, repeated for an entire session because nothing was learned from the first denial. At volume this dominates both cost and latency.
 
 **What it does.** Teaches the diagnosis first, because there are two kinds of gate and they need opposite responses:
 
@@ -229,6 +229,53 @@ graph LR
 ```
 
 Independently useful; together they take you from a published design system to a shipped, privileged native app.
+
+
+---
+
+## Code
+
+The skills above are playbooks. This repository also ships a Swift package that turns them into usable, tested code so buyers get more than prose.
+
+```bash
+swift build
+swift test          # 69 tests; pure logic runs on Linux and macOS
+```
+
+| Module | Skill it implements | What it contains |
+|---|---|---|
+| `FigmaKitExtract` | `figma-apple-kit-extract` | Multi-stage pipeline: Figma REST/MCP JSON -> typed `DesignNode` -> `ComponentToken` -> SwiftUI source. Variant selection, variable-alias resolution, single-term search planner, cover-only kit detection. |
+| `KitGeometry` | (shared with extract + `images.swift`) | Miter-offset ribbon (`pulseMark`), per-facet normal shading, Big Sur icon grid, superellipse. CoreGraphics drawing is behind `#if canImport(CoreGraphics)`. |
+| `RootAgent` | `passwordless-root-agent` | Request/reply protocol, whitelist registry, request state machine (`pending -> validated -> running -> replied / rejected`), LaunchDaemon plist + agent.sh + install/uninstall generators, spool client, battery ioreg parsing + Kalman smoother. |
+| `NoXcodeBuild` | `macos-app-no-xcode` | `Info.plist` generation, `.app` bundle layout, compile/codesign/iconutil command plans, reproducible `build.sh`, glass-panel recipe notes. |
+| `GatedToolPreflight` | `gated-tool-preflight` | Gate classifier (content-checking vs unconditional), preamble batching, trigger-count reducer. |
+| `ToolkitCore` | (shared) | Deterministic XML plist writer, POSIX/AppleScript quoting, identifier validation. |
+
+CLI tools (also produced by `swift build`):
+
+```bash
+swift run adt-figma extract -i node.json -o Kit.swift --select Mode=Dark
+swift run adt-figma queries "window panel material glass button"
+swift run adt-build plan main.swift --name MyApp --id com.example.myapp --steps
+swift run adt-build plist main.swift --name MyApp --id com.example.myapp
+swift run adt-rootagent agent --name MacPulse --id com.example.macpulse -o agent.sh
+swift run adt-rootagent plist --name MacPulse --id com.example.macpulse
+```
+
+Sample Figma JSON fixtures under `Tests/FigmaKitExtractTests/Fixtures/` are authored for this repo. They are not Apple kit data.
+
+### Root-agent security model
+
+The passwordless root helper is safe because of a small set of hard rules, all enforced in `RootAgent` and baked into the generated `agent.sh`:
+
+1. **Bare verbs only.** A request file is parsed as `head -1 | tr -cd 'a-z'`. No arguments, paths, or flags from the spool ever reach a command line.
+2. **Fixed whitelist.** Each verb maps to an absolute executable and a constant argument list authored at install time. Unknown verbs are ignored.
+3. **Root-owned agent.** The installer copies `agent.sh` out of the (user-writable) app bundle into `/Library/Application Support/<App>/`, then `chown root:wheel` + `chmod 755` *before* `launchctl bootstrap`. Root never executes a user-writable file.
+4. **Agent-built paths.** Report paths are constructed by the agent (`scan-YYYYMMDD-HHMMSS.txt` under a root-owned directory). Reply ids are sanitised to `[A-Za-z0-9]`.
+5. **Sticky spool.** The spool directory is mode `1777` (world-writable, sticky) by design. That is acceptable only because of rules 1 and 2: the worst a hostile process can do is ask for an operation the user already authorised.
+6. **One admin prompt.** Install uses a single `osascript … with administrator privileges` sheet; afterwards the LaunchDaemon answers without prompting. Uninstall boots out the daemon and removes the support directory.
+
+macOS-only runtime pieces (`codesign`, `sips`, `iconutil`, `launchctl`, AppKit glass) are planned on every platform and executed only on a Mac.
 
 ## Regenerate the imagery
 

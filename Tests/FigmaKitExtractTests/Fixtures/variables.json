@@ -1,0 +1,44 @@
+{
+  "meta": {
+    "variableCollections": {
+      "CollectionID:1": {
+        "id": "CollectionID:1",
+        "name": "Controls",
+        "defaultModeId": "ModeID:dark",
+        "modes": [
+          { "modeId": "ModeID:dark", "name": "Dark" },
+          { "modeId": "ModeID:light", "name": "Light" }
+        ]
+      }
+    },
+    "variables": {
+      "VariableID:track": {
+        "id": "VariableID:track",
+        "name": "Toggle/Track-On",
+        "variableCollectionId": "CollectionID:1",
+        "valuesByMode": {
+          "ModeID:dark": { "r": 0.2, "g": 0.78, "b": 0.35, "a": 1 },
+          "ModeID:light": { "r": 0.18, "g": 0.72, "b": 0.32, "a": 1 }
+        }
+      },
+      "VariableID:alias": {
+        "id": "VariableID:alias",
+        "name": "Toggle/Track-Alias",
+        "variableCollectionId": "CollectionID:1",
+        "valuesByMode": {
+          "ModeID:dark": { "type": "VARIABLE_ALIAS", "id": "VariableID:track" },
+          "ModeID:light": { "type": "VARIABLE_ALIAS", "id": "VariableID:track" }
+        }
+      },
+      "VariableID:radius": {
+        "id": "VariableID:radius",
+        "name": "Button/Radius",
+        "variableCollectionId": "CollectionID:1",
+        "valuesByMode": {
+          "ModeID:dark": 1000,
+          "ModeID:light": 1000
+        }
+      }
+    }
+  }
+}

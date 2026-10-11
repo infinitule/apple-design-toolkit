@@ -1,0 +1,161 @@
+import Foundation
+import ToolkitCore
+
+/// Compile + assemble + ad-hoc codesign plan. Pure: returns argv and paths.
+/// Running it needs macOS (swiftc targeting AppKit, codesign, optionally sips).
+public struct BuildPlan {
+    public enum BuildError: Error, Equatable {
+        case sourceMustBeNamedMainSwift(String)
+        case missingSource(String)
+        case invalidDestination(String)
+    }
+
+    public var sourcePath: String
+    public var info: AppInfo
+    public var destinationDir: String
+    public var optimization: String
+    public var frameworks: [String]
+    public var resources: [(source: String, name: String)]
+    public var iconPNG: String?
+    public var extraSwiftFlags: [String]
+
+    public init(sourcePath: String, info: AppInfo,
+                destinationDir: String, optimization: String = "-O",
+                frameworks: [String] = [],
+                resources: [(source: String, name: String)] = [],
+                iconPNG: String? = nil,
+                extraSwiftFlags: [String] = []) throws {
+        let base = (sourcePath as NSString).lastPathComponent
+        // Top-level code REQUIRES the file be named main.swift (skill).
+        guard base == "main.swift" else { throw BuildError.sourceMustBeNamedMainSwift(base) }
+        self.sourcePath = sourcePath
+        self.info = info
+        self.destinationDir = destinationDir
+        self.optimization = optimization
+        self.frameworks = frameworks
+        self.resources = resources
+        self.iconPNG = iconPNG
+        self.extraSwiftFlags = extraSwiftFlags
+    }
+
+    public var bundle: AppBundlePlan {
+        var res = resources.map(\.name)
+        if iconPNG != nil { res.append("\(info.iconFile ?? "AppIcon").icns") }
+        return AppBundlePlan(info: info, resources: res, frameworks: frameworks)
+    }
+
+    public var appRoot: String {
+        (destinationDir as NSString).appendingPathComponent(bundle.bundleName)
+    }
+
+    public var stagingBinary: String {
+        (destinationDir as NSString).appendingPathComponent(info.executable + ".unbundled")
+    }
+
+    /// `swiftc` argv. The file must be named main.swift for top-level code.
+    public func compileCommand(swiftc: String = "/usr/bin/swiftc") -> [String] {
+        var argv = [swiftc, optimization, sourcePath, "-o", stagingBinary,
+                    "-framework", "AppKit", "-framework", "SwiftUI",
+                    "-framework", "Cocoa"]
+        argv.append(contentsOf: extraSwiftFlags)
+        return argv
+    }
+
+    /// Ad-hoc codesign from the skill: `codesign --force --deep -s - APP`.
+    /// Required on Apple Silicon even for local runs.
+    public func codesignCommand(codesign: String = "/usr/bin/codesign") -> [String] {
+        [codesign, "--force", "--deep", "-s", "-", appRoot]
+    }
+
+    public func touchCommand() -> [String] { ["/usr/bin/touch", appRoot] }
+
+    public func lsregisterCommand() -> [String] {
+        ["/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+         "-f", appRoot]
+    }
+
+    /// Ordered steps a runner executes. Each step is either argv or a pure
+    /// filesystem action described in enough detail to implement once.
+    public enum Step: Equatable {
+        case run([String])
+        case mkdir(String)
+        case writeFile(path: String, contents: String)
+        case copyFile(from: String, to: String)
+        case note(String)
+    }
+
+    public func steps() -> [Step] {
+        var s: [Step] = []
+        s.append(.run(compileCommand()))
+        s.append(.mkdir(appRoot + "/Contents/MacOS"))
+        s.append(.mkdir(appRoot + "/Contents/Resources"))
+        if !frameworks.isEmpty { s.append(.mkdir(appRoot + "/Contents/Frameworks")) }
+        s.append(.writeFile(path: appRoot + "/Contents/Info.plist", contents: info.xml()))
+        s.append(.copyFile(from: stagingBinary, to: appRoot + "/Contents/MacOS/\(info.executable)"))
+        for r in resources {
+            s.append(.copyFile(from: r.source, to: appRoot + "/Contents/Resources/\(r.name)"))
+        }
+        if let iconPNG {
+            let iconset = destinationDir + "/AppIcon.iconset"
+            let icns = appRoot + "/Contents/Resources/\(info.iconFile ?? "AppIcon").icns"
+            s.append(.mkdir(iconset))
+            for cmd in IconsetPlan().sipsCommands(sourcePNG: iconPNG, iconsetDir: iconset) {
+                s.append(.run(cmd))
+            }
+            s.append(.run(IconsetPlan().iconutilCommand(iconsetDir: iconset, outputICNS: icns)))
+        }
+        s.append(.run(codesignCommand()))
+        s.append(.run(touchCommand()))
+        s.append(.note("Optional: run lsregister and relaunch Finder/Dock to bust icon caches"))
+        return s
+    }
+
+    /// Render a reproducible build.sh (skill: "a build.sh makes the repo
+    /// one-command reproducible").
+    public func renderBuildScript() -> String {
+        var lines = [
+            "#!/bin/bash",
+            "# Generated by AppleDesignToolkit NoXcodeBuild. Do not edit.",
+            "set -euo pipefail",
+            "DEST=\(Shell.quote(destinationDir))",
+            "mkdir -p \"$DEST\"",
+            Shell.join(compileCommand()),
+            "APP=\(Shell.quote(appRoot))",
+            "rm -rf \"$APP\"",
+            "mkdir -p \"$APP/Contents/MacOS\" \"$APP/Contents/Resources\"",
+            "cat > \"$APP/Contents/Info.plist\" <<'PLIST'",
+            info.xml().trimmingCharacters(in: CharacterSet(charactersIn: "\n")),
+            "PLIST",
+            "cp \(Shell.quote(stagingBinary)) \"$APP/Contents/MacOS/\(info.executable)\"",
+            "chmod +x \"$APP/Contents/MacOS/\(info.executable)\"",
+        ]
+        for r in resources {
+            lines.append("cp \(Shell.quote(r.source)) \"$APP/Contents/Resources/\(Shell.quote(r.name).trimmingCharacters(in: CharacterSet(charactersIn: "'")))\"")
+        }
+        lines.append(Shell.join(codesignCommand()))
+        lines.append(Shell.join(touchCommand()))
+        lines.append("echo \"Built $APP\"")
+        return lines.joined(separator: "\n") + "\n"
+    }
+}
+
+/// Iteration loop from the skill: pkill the exact binary path, replace, resign, open.
+public struct IterationLoop {
+    public var appRoot: String
+    public var executableRelPath: String
+
+    public init(plan: BuildPlan) {
+        self.appRoot = plan.appRoot
+        self.executableRelPath = plan.bundle.executableRelPath
+    }
+
+    public var binaryPath: String { (appRoot as NSString).appendingPathComponent(executableRelPath) }
+
+    public func pkillCommand() -> [String] {
+        // -f matches the full command line; we pass the absolute binary path
+        // so we never kill a different app of the same name.
+        ["/usr/bin/pkill", "-f", binaryPath]
+    }
+
+    public func openCommand() -> [String] { ["/usr/bin/open", appRoot] }
+}

@@ -1,0 +1,111 @@
+{
+  "document": {
+    "id": "1:1",
+    "name": "Toggles — Switches",
+    "type": "COMPONENT_SET",
+    "width": 54,
+    "height": 24,
+    "componentPropertyDefinitions": {
+      "Mode": { "type": "VARIANT", "variantOptions": ["Dark", "Light"] },
+      "State": { "type": "VARIANT", "variantOptions": ["Off", "On"] }
+    },
+    "children": [
+      {
+        "id": "1:2",
+        "name": "Mode=Dark, State=On",
+        "type": "COMPONENT",
+        "absoluteBoundingBox": { "x": 0, "y": 0, "width": 54, "height": 24 },
+        "cornerRadius": 1000,
+        "fills": [
+          {
+            "type": "SOLID",
+            "opacity": 0.85,
+            "color": { "r": 0.2, "g": 0.78, "b": 0.35, "a": 1 },
+            "boundVariables": { "color": { "type": "VARIABLE_ALIAS", "id": "VariableID:track" } }
+          }
+        ],
+        "effects": [
+          {
+            "type": "DROP_SHADOW",
+            "radius": 3,
+            "offset": { "x": 0, "y": 3 },
+            "color": { "r": 0, "g": 0, "b": 0, "a": 0.18 },
+            "visible": true
+          }
+        ],
+        "children": [
+          {
+            "id": "1:3",
+            "name": "Knob",
+            "type": "ELLIPSE",
+            "absoluteBoundingBox": { "x": 20, "y": 2, "width": 32, "height": 20 },
+            "cornerRadius": 1000,
+            "fills": [
+              { "type": "SOLID", "color": { "r": 1, "g": 1, "b": 1, "a": 1 } }
+            ],
+            "effects": [
+              {
+                "type": "DROP_SHADOW",
+                "radius": 3,
+                "offset": { "x": 0, "y": 3 },
+                "color": { "r": 0, "g": 0, "b": 0, "a": 0.2 },
+                "visible": true
+              }
+            ],
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "1:4",
+        "name": "Mode=Dark, State=Off",
+        "type": "COMPONENT",
+        "width": 54,
+        "height": 24,
+        "cornerRadius": 1000,
+        "fills": [
+          { "type": "SOLID", "opacity": 0.85, "color": { "r": 0, "g": 0, "b": 0, "a": 1 } }
+        ],
+        "effects": [],
+        "children": [
+          {
+            "id": "1:5",
+            "name": "Knob",
+            "type": "ELLIPSE",
+            "width": 32,
+            "height": 20,
+            "cornerRadius": 1000,
+            "fills": [
+              { "type": "SOLID", "color": { "r": 1, "g": 1, "b": 1, "a": 1 } }
+            ],
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "1:6",
+        "name": "Mode=Light, State=On",
+        "type": "COMPONENT",
+        "width": 54,
+        "height": 24,
+        "cornerRadius": 1000,
+        "fills": [
+          { "type": "SOLID", "opacity": 0.85, "color": { "r": 0.2, "g": 0.78, "b": 0.35, "a": 1 } }
+        ],
+        "children": []
+      },
+      {
+        "id": "1:7",
+        "name": "Mode=Light, State=Off",
+        "type": "COMPONENT",
+        "width": 54,
+        "height": 24,
+        "cornerRadius": 1000,
+        "fills": [
+          { "type": "SOLID", "opacity": 0.2, "color": { "r": 0, "g": 0, "b": 0, "a": 1 } }
+        ],
+        "children": []
+      }
+    ]
+  }
+}
