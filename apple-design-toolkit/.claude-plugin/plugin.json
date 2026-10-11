@@ -1,7 +1,7 @@
 {
   "name": "apple-design-toolkit",
-  "version": "1.1.0",
-  "description": "Extract exact design specs from Apple's official Figma UI kits into SwiftUI, build signed macOS apps from a single Swift file without an Xcode project, implement password-free root operations safely, and preflight harness gates that block tool calls.",
+  "version": "1.2.0",
+  "description": "Extract exact design specs from Apple's official Figma UI kits into SwiftUI, build signed macOS apps from a single Swift file without an Xcode project, implement password-free root operations safely, and preflight harness gates that block tool calls. Includes a tested Swift package implementing each skill.",
   "author": {
     "name": "Chandandeep Sharma",
     "email": "me@chandanofficial.com"

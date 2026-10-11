@@ -1,0 +1,36 @@
+{
+  "anatomy": {
+    "name": "Button",
+    "type": "COMPONENT",
+    "w": 120,
+    "h": 32,
+    "r": 1000,
+    "fills": [
+      { "s": [0, 0, 0], "o": 0.25 },
+      { "s": [255, 255, 255], "o": 0.25 },
+      { "s": [68, 68, 68], "o": 0.6 },
+      { "s": [248, 248, 248], "o": 0.2 }
+    ],
+    "fx": [
+      { "t": "GLASS", "r": 20 },
+      { "t": "INNER_SHADOW", "r": 12, "y": 40, "a": 0.35 },
+      { "t": "INNER_SHADOW", "r": 12, "y": -40, "a": 0.25 },
+      { "t": "DROP_SHADOW", "r": 15, "y": 8, "a": 0.02 }
+    ],
+    "ch": [
+      {
+        "name": "Label",
+        "type": "TEXT",
+        "w": 64,
+        "h": 16,
+        "fills": [{ "s": [255, 255, 255], "o": 1 }]
+      }
+    ]
+  },
+  "variants": [
+    "Mode=Dark, State=Idle",
+    "Mode=Dark, State=Clicked",
+    "Mode=Light, State=Idle",
+    "Mode=Light, State=Clicked"
+  ]
+}
