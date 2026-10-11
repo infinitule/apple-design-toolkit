@@ -5,9 +5,9 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Claude_Code-plugin-D97757?style=flat-square" alt="Claude Code plugin">
   <img src="https://img.shields.io/badge/skills-4-0A84FF?style=flat-square" alt="4 skills">
-  <img src="https://img.shields.io/badge/macOS-13%2B-1d1d1f?style=flat-square&logo=apple&logoColor=white" alt="macOS 13+">
+  <img src="https://img.shields.io/badge/macOS-13%2B-1d1d1f?style=flat-square" alt="macOS 13+">
   <img src="https://img.shields.io/badge/SwiftUI-AppKit-F05138?style=flat-square&logo=swift&logoColor=white" alt="SwiftUI + AppKit">
-  <img src="https://img.shields.io/badge/license-MIT-8E8E93?style=flat-square" alt="MIT">
+  <img src="https://img.shields.io/badge/license-Proprietary-8E8E93?style=flat-square" alt="Proprietary">
 </p>
 
 <p align="center">
@@ -297,4 +297,4 @@ macOS, the macOS UI Kit, SF Pro and SF Symbols are trademarks and copyrighted wo
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Proprietary - Copyright (c) 2026 Chandandeep Sharma. All rights reserved. See [LICENSE](LICENSE). Use requires a written license or a marketplace purchase; buyers receive the rights stated in that sale agreement. Not affiliated with Apple Inc.

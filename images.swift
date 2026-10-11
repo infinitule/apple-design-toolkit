@@ -328,7 +328,7 @@ do {
 }
 
 // ===========================================================================
-// JONY IVE SERIES — reduction, negative space, obsessive measurement.
+// PRECISION SERIES - reduction, negative space, obsessive measurement.
 // Light, quiet, one idea per image. All geometry from the macOS 27 kit.
 // ===========================================================================
 

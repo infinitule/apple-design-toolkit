@@ -1,5 +1,8 @@
 // swift-tools-version:5.9
 //
+// Copyright (c) 2026 Chandandeep Sharma. All rights reserved.
+// Proprietary. See LICENSE. Not affiliated with Apple Inc.
+//
 // Executable code for the four skills in apple-design-toolkit.
 // Pure logic builds and tests on Linux; macOS-only steps (codesign, sips,
 // iconutil, launchctl, CoreGraphics paths) sit behind #if canImport/#if os.
